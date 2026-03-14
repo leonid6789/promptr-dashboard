@@ -1,15 +1,38 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 
 export function PromtprDashboard() {
   const [prompt, setPrompt] = useState("")
+  const [credits, setCredits] = useState<number>(0)
 
-  const handleGenerate = () => {
-    console.log("Generating with prompt:", prompt)
+  useEffect(() => {
+    const fetchCredits = async () => {
+      const supabase = createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) return
+      const { data } = await supabase
+        .from("UsersTBL")
+        .select("credits")
+        .eq("id", user.id)
+        .single()
+      setCredits(data?.credits ?? 0)
+    }
+    fetchCredits()
+  }, [])
+
+  const handleGenerate = async () => {
+    if (credits <= 0) return
+    const supabase = createClient()
+    const { error } = await supabase.rpc("decrement_credits", { amount: 1 })
+    if (!error) {
+      setCredits((prev) => Math.max(0, prev - 1))
+    }
   }
 
   const handleLogout = async () => {
@@ -25,7 +48,7 @@ export function PromtprDashboard() {
 
         <div className="flex items-center gap-3">
           <div className="rounded-full bg-white px-4 py-2 text-sm text-black shadow-sm ring-1 ring-gray-200">
-            14 Credits Remaining
+            {credits} Credits Remaining
           </div>
           <Button
             variant="outline"
