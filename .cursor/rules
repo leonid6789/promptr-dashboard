@@ -1,0 +1,26 @@
+You are working inside a Next.js 14 App Router project generated from v0.dev.
+
+Tech stack:
+- Next.js
+- React
+- TypeScript
+- TailwindCSS
+- shadcn/ui components
+
+Rules:
+
+1. Never rewrite entire files unless explicitly requested.
+2. Prefer editing existing components instead of creating duplicates.
+3. Preserve Tailwind classes unless the user asks to modify styling.
+4. Use functional React components.
+5. Do not change project structure unless instructed.
+6. Keep components small and reusable.
+7. When adding UI elements, prefer existing shadcn/ui components from /components/ui.
+8. Do not introduce new UI libraries.
+9. Follow existing naming conventions.
+10. Do not modify package.json unless dependencies are required.
+
+Code Style:
+- TypeScript only
+- Use arrow functions for components
+- Keep code concise and readable

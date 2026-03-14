@@ -1,0 +1,71 @@
+"use client"
+
+import { useState } from "react"
+import { createClient } from "@/lib/supabase/client"
+import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
+
+export function PromtprDashboard() {
+  const [prompt, setPrompt] = useState("")
+
+  const handleGenerate = () => {
+    console.log("Generating with prompt:", prompt)
+  }
+
+  const handleLogout = async () => {
+    await createClient().auth.signOut()
+    window.location.href = "/"
+  }
+
+  return (
+    <div className="flex min-h-screen flex-col bg-gray-100">
+      {/* Top Bar */}
+      <header className="flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4">
+        <h1 className="text-xl font-bold text-black">Promptr</h1>
+
+        <div className="flex items-center gap-3">
+          <div className="rounded-full bg-white px-4 py-2 text-sm text-black shadow-sm ring-1 ring-gray-200">
+            14 Credits Remaining
+          </div>
+          <Button
+            variant="outline"
+            onClick={handleLogout}
+            className="rounded-lg border-gray-200 bg-white text-black hover:bg-gray-50"
+          >
+            Log out
+          </Button>
+          <Button className="rounded-lg bg-black text-white hover:bg-black/90">
+            Upgrade
+          </Button>
+        </div>
+      </header>
+
+      {/* Main Body */}
+      <main className="flex flex-1 gap-4 p-6">
+        {/* Left Panel */}
+        <div className="relative flex flex-1 flex-col rounded-xl bg-gray-50 ring-1 ring-gray-200">
+          <Textarea
+            placeholder="Describe your UI component here"
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            className="flex-1 resize-none border-0 bg-transparent p-4 text-base focus-visible:ring-0"
+          />
+          <div className="p-4 pt-0">
+            <Button
+              onClick={handleGenerate}
+              className="ml-auto block rounded-lg bg-black px-6 text-white hover:bg-black/90"
+            >
+              Generate
+            </Button>
+          </div>
+        </div>
+
+        {/* Divider */}
+        <div className="w-px bg-gray-200" />
+
+        {/* Right Panel */}
+        <div className="flex-1 rounded-xl bg-gray-50 ring-1 ring-gray-200" />
+      </main>
+    </div>
+  )
+}
