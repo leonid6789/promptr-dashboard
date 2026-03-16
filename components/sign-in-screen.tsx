@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Field, FieldLabel } from "@/components/ui/field"
@@ -12,21 +13,27 @@ export function SignInScreen() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    const trimmed = email.trim()
+    if (!trimmed) {
+      toast.error("Please enter your email address.")
+      return
+    }
+
     const supabase = createClient()
 
     const { error } = await supabase.auth.signInWithOtp({
-      email,
+      email: trimmed,
       options: {
         emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
     })
 
     if (error) {
-      console.error("Login error:", error.message)
+      toast.error(error.message)
       return
     }
 
-    alert("Check your email for the login link!")
+    toast.success("Check your email for the login link!")
   }
 
   return (
