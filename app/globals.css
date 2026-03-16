@@ -123,3 +123,9 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Make the Next.js development indicator less obtrusive without removing it */
+.nextjs-portal {
+  transform: scale(0.75);
+  transform-origin: bottom left;
+}

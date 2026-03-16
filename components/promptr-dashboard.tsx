@@ -40,6 +40,7 @@ export function PromtprDashboard() {
   const [speechError, setSpeechError] = useState<string | null>(null)
   const [isSpeechSupported, setIsSpeechSupported] = useState(false)
   const [interimTranscript, setInterimTranscript] = useState("")
+  const [isCopied, setIsCopied] = useState(false)
 
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
   const sessionFinalTranscriptRef = useRef("")
@@ -191,6 +192,19 @@ export function PromtprDashboard() {
     window.location.href = "/"
   }
 
+  const handleCopyImprovedPrompt = async () => {
+    if (!improvedPrompt) return
+    if (!navigator?.clipboard?.writeText) return
+
+    try {
+      await navigator.clipboard.writeText(improvedPrompt)
+      setIsCopied(true)
+      setTimeout(() => setIsCopied(false), 1500)
+    } catch {
+      // silently fail if clipboard is unavailable
+    }
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-gray-100">
       {/* Top Bar */}
@@ -224,31 +238,29 @@ export function PromtprDashboard() {
             onChange={(e) => setPrompt(e.target.value)}
             className="flex-1 resize-none border-0 bg-transparent p-4 text-base focus-visible:ring-0"
           />
-          <div className="flex items-center justify-between gap-2 p-4 pt-0">
-            <div className="flex flex-1 items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleToggleListening}
-                disabled={!isSpeechSupported}
-                className="rounded-lg border-gray-200 bg-white text-sm text-black hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isListening ? "Listening…" : "Speak"}
-              </Button>
-              {isListening && (
-                <span className="truncate text-xs text-gray-500">
-                  {interimTranscript || "Listening… speak now."}
-                </span>
-              )}
-            </div>
+          <div className="flex items-center justify-end gap-2 p-4 pt-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleToggleListening}
+              disabled={!isSpeechSupported}
+              className="rounded-lg border-gray-200 bg-white text-sm text-black hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isListening ? "Listening…" : "Speak"}
+            </Button>
             <Button
               onClick={handleGenerate}
               disabled={isGenerating || credits <= 0}
-              className="ml-auto block rounded-lg bg-black px-6 text-white hover:bg-black/90 disabled:opacity-50"
+              className="rounded-lg bg-black px-6 text-white hover:bg-black/90 disabled:opacity-50"
             >
               {isGenerating ? "Generating…" : "Generate"}
             </Button>
           </div>
+          {isListening && (
+            <p className="px-4 text-xs text-gray-500">
+              {interimTranscript || "Listening… speak now."}
+            </p>
+          )}
           {speechError && (
             <p className="px-4 pb-4 text-xs text-red-600">{speechError}</p>
           )}
@@ -259,6 +271,18 @@ export function PromtprDashboard() {
 
         {/* Right Panel */}
         <div className="flex flex-1 flex-col rounded-xl bg-gray-50 ring-1 ring-gray-200 p-4">
+          {improvedPrompt && (
+            <div className="mb-2 flex justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleCopyImprovedPrompt}
+                className="rounded-lg border-gray-200 bg-white px-3 py-1 text-xs text-black hover:bg-gray-50"
+              >
+                {isCopied ? "Copied!" : "Copy"}
+              </Button>
+            </div>
+          )}
           {generateError && (
             <p className="mb-2 text-sm text-red-600">{generateError}</p>
           )}
