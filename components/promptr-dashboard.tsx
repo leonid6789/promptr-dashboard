@@ -1,9 +1,34 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+
+type SpeechRecognitionResult = {
+  0: {
+    transcript: string
+  }
+  isFinal: boolean
+}
+
+type SpeechRecognitionResultEvent = {
+  results: ArrayLike<SpeechRecognitionResult>
+}
+
+type SpeechRecognitionInstance = {
+  continuous: boolean
+  interimResults: boolean
+  lang: string
+  start: () => void
+  stop: () => void
+  onresult: ((event: SpeechRecognitionResultEvent) => void) | null
+  onerror: (() => void) | null
+  onstart: (() => void) | null
+  onend: (() => void) | null
+}
+
+type BrowserSpeechRecognitionConstructor = new () => SpeechRecognitionInstance
 
 export function PromtprDashboard() {
   const [prompt, setPrompt] = useState("")
@@ -11,6 +36,13 @@ export function PromtprDashboard() {
   const [improvedPrompt, setImprovedPrompt] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
   const [generateError, setGenerateError] = useState<string | null>(null)
+  const [isListening, setIsListening] = useState(false)
+  const [speechError, setSpeechError] = useState<string | null>(null)
+  const [isSpeechSupported, setIsSpeechSupported] = useState(false)
+  const [interimTranscript, setInterimTranscript] = useState("")
+
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
+  const sessionFinalTranscriptRef = useRef("")
 
   useEffect(() => {
     const fetchCredits = async () => {
@@ -28,6 +60,109 @@ export function PromtprDashboard() {
     }
     fetchCredits()
   }, [])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+
+    const browserWindow = window as unknown as {
+      SpeechRecognition?: BrowserSpeechRecognitionConstructor
+      webkitSpeechRecognition?: BrowserSpeechRecognitionConstructor
+    }
+
+    const SpeechRecognitionConstructor =
+      browserWindow.SpeechRecognition ?? browserWindow.webkitSpeechRecognition
+
+    if (!SpeechRecognitionConstructor) {
+      setIsSpeechSupported(false)
+      return
+    }
+
+    setIsSpeechSupported(true)
+
+    const recognition = new SpeechRecognitionConstructor()
+    recognition.continuous = false
+    recognition.interimResults = true
+    recognition.lang = "en-US"
+
+    recognition.onresult = (event: SpeechRecognitionResultEvent) => {
+      const results = Array.from(event.results)
+
+      const finalText = results
+        .filter((result) => result.isFinal)
+        .map((result) => result[0]?.transcript ?? "")
+        .join(" ")
+        .trim()
+
+      const interimText = results
+        .filter((result) => !result.isFinal)
+        .map((result) => result[0]?.transcript ?? "")
+        .join(" ")
+        .trim()
+
+      if (finalText) {
+        sessionFinalTranscriptRef.current = finalText
+      }
+
+      setInterimTranscript(interimText)
+    }
+
+    recognition.onerror = () => {
+      setSpeechError("There was a problem with speech recognition. Please try again.")
+      setIsListening(false)
+    }
+
+    recognition.onstart = () => {
+      setSpeechError(null)
+      setIsListening(true)
+      setInterimTranscript("")
+      sessionFinalTranscriptRef.current = ""
+    }
+
+    recognition.onend = () => {
+      setIsListening(false)
+      setInterimTranscript("")
+
+      const finalText = sessionFinalTranscriptRef.current.trim()
+      if (finalText) {
+        setPrompt((prev) => {
+          if (!prev) return finalText
+          const needsSpace = !prev.endsWith(" ")
+          return `${prev}${needsSpace ? " " : ""}${finalText}`
+        })
+      }
+
+      sessionFinalTranscriptRef.current = ""
+    }
+
+    recognitionRef.current = recognition
+
+    return () => {
+      recognition.stop()
+      recognitionRef.current = null
+    }
+  }, [])
+
+  const handleToggleListening = () => {
+    if (!isSpeechSupported) {
+      setSpeechError(
+        "Speech recognition is not supported in this browser. Please try a different browser."
+      )
+      return
+    }
+
+    if (!recognitionRef.current) {
+      setSpeechError("Speech recognition is not available right now. Please try again.")
+      return
+    }
+
+    setSpeechError(null)
+
+    if (isListening) {
+      recognitionRef.current.stop()
+    } else {
+      recognitionRef.current.start()
+    }
+  }
 
   const handleGenerate = async () => {
     if (credits <= 0) return
@@ -89,7 +224,23 @@ export function PromtprDashboard() {
             onChange={(e) => setPrompt(e.target.value)}
             className="flex-1 resize-none border-0 bg-transparent p-4 text-base focus-visible:ring-0"
           />
-          <div className="p-4 pt-0">
+          <div className="flex items-center justify-between gap-2 p-4 pt-0">
+            <div className="flex flex-1 items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleToggleListening}
+                disabled={!isSpeechSupported}
+                className="rounded-lg border-gray-200 bg-white text-sm text-black hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isListening ? "Listening…" : "Speak"}
+              </Button>
+              {isListening && (
+                <span className="truncate text-xs text-gray-500">
+                  {interimTranscript || "Listening… speak now."}
+                </span>
+              )}
+            </div>
             <Button
               onClick={handleGenerate}
               disabled={isGenerating || credits <= 0}
@@ -98,6 +249,9 @@ export function PromtprDashboard() {
               {isGenerating ? "Generating…" : "Generate"}
             </Button>
           </div>
+          {speechError && (
+            <p className="px-4 pb-4 text-xs text-red-600">{speechError}</p>
+          )}
         </div>
 
         {/* Divider */}
