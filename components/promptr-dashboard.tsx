@@ -168,6 +168,7 @@ export function PromtprDashboard() {
   const handleGenerate = async () => {
     if (credits <= 0) return
     setGenerateError(null)
+    setImprovedPrompt("")
     setIsGenerating(true)
     try {
       const res = await fetch("/api/improve-prompt", {
@@ -175,13 +176,53 @@ export function PromtprDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt }),
       })
-      const data = await res.json().catch(() => ({}))
       if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
         setGenerateError(data.error ?? "Something went wrong")
         return
       }
-      setImprovedPrompt(data.improvedPrompt ?? "")
-      if (typeof data.credits === "number") setCredits(data.credits)
+
+      if (!res.body) {
+        setGenerateError("No response from server")
+        return
+      }
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let done = false
+
+      while (!done) {
+        const { value, done: doneReading } = await reader.read()
+        done = doneReading
+        if (!value) continue
+
+        const chunkText = decoder.decode(value, { stream: !done })
+        const lines = chunkText.split("\n").filter((line) => line.trim().length > 0)
+
+        for (const line of lines) {
+          try {
+            const payload = JSON.parse(line) as {
+              type: "chunk" | "done" | "error"
+              text?: string
+              fullText?: string
+              credits?: number
+              error?: string
+            }
+
+            if (payload.type === "chunk" && payload.text) {
+              setImprovedPrompt((prev) => prev + payload.text)
+            } else if (payload.type === "done") {
+              if (typeof payload.credits === "number") {
+                setCredits(payload.credits)
+              }
+            } else if (payload.type === "error") {
+              setGenerateError(payload.error ?? "Something went wrong")
+            }
+          } catch {
+            // Ignore malformed JSON chunks
+          }
+        }
+      }
     } finally {
       setIsGenerating(false)
     }

@@ -42,7 +42,7 @@ export async function POST(request: Request) {
       )
     }
 
-    const msg = await anthropic.messages.create({
+    const stream = await anthropic.messages.stream({
       model: "claude-sonnet-4-6",
       max_tokens: 2500,
       temperature: 0.7,
@@ -57,31 +57,75 @@ export async function POST(request: Request) {
       thinking: { type: "disabled" },
     })
 
-    const textBlock = msg.content.find(
-      (block): block is { type: "text"; text: string } => block.type === "text"
-    )
-    const improvedPrompt = textBlock?.text?.trim() ?? ""
+    const encoder = new TextEncoder()
+    let fullText = ""
 
-    const { error: decrementError } = await supabase.rpc("decrement_credits", {
-      amount: 1,
+    const readableStream = new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const event of stream) {
+            if (
+              event.type === "content_block_delta" &&
+              event.delta.type === "text_delta" &&
+              typeof event.delta.text === "string"
+            ) {
+              const chunk = event.delta.text
+              fullText += chunk
+              const payload = JSON.stringify({
+                type: "chunk",
+                text: chunk,
+              })
+              controller.enqueue(encoder.encode(`${payload}\n`))
+            }
+          }
+
+          const { error: decrementError } = await supabase.rpc(
+            "decrement_credits",
+            {
+              amount: 1,
+            }
+          )
+
+          let updatedCredits = credits
+
+          if (decrementError) {
+            console.error("decrement_credits failed:", decrementError)
+          } else {
+            const { data: updated } = await supabase
+              .from("UsersTBL")
+              .select("credits")
+              .eq("id", user.id)
+              .single()
+            updatedCredits = updated?.credits ?? credits - 1
+          }
+
+          const finalPayload = JSON.stringify({
+            type: "done",
+            fullText: fullText.trim(),
+            credits: updatedCredits,
+          })
+          controller.enqueue(encoder.encode(`${finalPayload}\n`))
+          controller.close()
+        } catch (err) {
+          console.error("improve-prompt stream error:", err)
+          const errorPayload = JSON.stringify({
+            type: "error",
+            error: "Failed to improve prompt",
+          })
+          controller.enqueue(encoder.encode(`${errorPayload}\n`))
+          controller.close()
+        } finally {
+          // Allow the underlying SDK to clean up the stream internally
+        }
+      },
     })
-    if (decrementError) {
-      console.error("decrement_credits failed:", decrementError)
-      return NextResponse.json(
-        { error: "Failed to deduct credit" },
-        { status: 500 }
-      )
-    }
 
-    const { data: updated } = await supabase
-      .from("UsersTBL")
-      .select("credits")
-      .eq("id", user.id)
-      .single()
-
-    return NextResponse.json({
-      improvedPrompt,
-      credits: updated?.credits ?? credits - 1,
+    return new Response(readableStream, {
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+      },
     })
   } catch (err) {
     console.error("improve-prompt error:", err)
