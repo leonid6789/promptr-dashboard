@@ -8,6 +8,9 @@ import { Textarea } from "@/components/ui/textarea"
 export function PromtprDashboard() {
   const [prompt, setPrompt] = useState("")
   const [credits, setCredits] = useState<number>(0)
+  const [improvedPrompt, setImprovedPrompt] = useState("")
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [generateError, setGenerateError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchCredits = async () => {
@@ -28,10 +31,23 @@ export function PromtprDashboard() {
 
   const handleGenerate = async () => {
     if (credits <= 0) return
-    const supabase = createClient()
-    const { error } = await supabase.rpc("decrement_credits", { amount: 1 })
-    if (!error) {
-      setCredits((prev) => Math.max(0, prev - 1))
+    setGenerateError(null)
+    setIsGenerating(true)
+    try {
+      const res = await fetch("/api/improve-prompt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setGenerateError(data.error ?? "Something went wrong")
+        return
+      }
+      setImprovedPrompt(data.improvedPrompt ?? "")
+      if (typeof data.credits === "number") setCredits(data.credits)
+    } finally {
+      setIsGenerating(false)
     }
   }
 
@@ -76,9 +92,10 @@ export function PromtprDashboard() {
           <div className="p-4 pt-0">
             <Button
               onClick={handleGenerate}
-              className="ml-auto block rounded-lg bg-black px-6 text-white hover:bg-black/90"
+              disabled={isGenerating || credits <= 0}
+              className="ml-auto block rounded-lg bg-black px-6 text-white hover:bg-black/90 disabled:opacity-50"
             >
-              Generate
+              {isGenerating ? "Generating…" : "Generate"}
             </Button>
           </div>
         </div>
@@ -87,7 +104,22 @@ export function PromtprDashboard() {
         <div className="w-px bg-gray-200" />
 
         {/* Right Panel */}
-        <div className="flex-1 rounded-xl bg-gray-50 ring-1 ring-gray-200" />
+        <div className="flex flex-1 flex-col rounded-xl bg-gray-50 ring-1 ring-gray-200 p-4">
+          {generateError && (
+            <p className="mb-2 text-sm text-red-600">{generateError}</p>
+          )}
+          {improvedPrompt ? (
+            <p className="flex-1 whitespace-pre-wrap text-base text-black">
+              {improvedPrompt}
+            </p>
+          ) : (
+            <p className="flex-1 text-base text-gray-500">
+              {isGenerating
+                ? "Improving your prompt…"
+                : "Improved prompt will appear here."}
+            </p>
+          )}
+        </div>
       </main>
     </div>
   )
