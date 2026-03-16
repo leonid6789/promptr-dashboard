@@ -9,6 +9,8 @@ import { createClient } from "@/lib/supabase/client"
 
 export function SignInScreen() {
   const [email, setEmail] = useState("")
+  const [sent, setSent] = useState(false)
+  const [sentEmail, setSentEmail] = useState("")
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -33,7 +35,26 @@ export function SignInScreen() {
       return
     }
 
-    toast.success("Check your email for the login link!")
+    setSentEmail(trimmed)
+    setSent(true)
+  }
+
+  if (sent) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-white">
+        <div className="w-full max-w-sm px-6 text-center">
+          <h1 className="mb-4 text-3xl font-bold text-black">
+            Check your email
+          </h1>
+          <p className="text-gray-600">
+            We sent a login link to{" "}
+            <span className="font-medium text-black">{sentEmail}</span>.
+            <br />
+            Click the link in your inbox to sign in.
+          </p>
+        </div>
+      </div>
+    )
   }
 
   return (
