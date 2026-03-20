@@ -44,13 +44,16 @@ export function SignInScreen() {
       <div className="flex min-h-screen items-center justify-center bg-white">
         <div className="w-full max-w-sm px-6 text-center">
           <h1 className="mb-4 text-3xl font-bold text-black">
-            Check your email
+            Check your inbox
           </h1>
           <p className="text-gray-600">
-            We sent a login link to{" "}
+            We sent a sign-in link to{" "}
             <span className="font-medium text-black">{sentEmail}</span>.
             <br />
-            Click the link in your inbox to sign in.
+            Click the link to continue.
+          </p>
+          <p className="mt-4 text-sm text-gray-400">
+            {"Don't see it? Check your spam or junk folder."}
           </p>
         </div>
       </div>
@@ -61,7 +64,7 @@ export function SignInScreen() {
     <div className="flex min-h-screen items-center justify-center bg-white">
       <div className="w-full max-w-sm px-6">
         <h1 className="mb-8 text-center text-3xl font-bold text-black">
-          Sign-In/Sign-Up
+          Sign in to Promptr
         </h1>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-6">
@@ -80,7 +83,7 @@ export function SignInScreen() {
             type="submit"
             className="w-full rounded-lg bg-black py-6 text-white hover:bg-black/90"
           >
-            {"Let's go!"}
+            Continue with email
           </Button>
         </form>
       </div>
