@@ -49,6 +49,7 @@ export function PromtprDashboard() {
   const [interimTranscript, setInterimTranscript] = useState("")
   const [isCopied, setIsCopied] = useState(false)
   const [history, setHistory] = useState<HistoryItem[]>([])
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
 
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
   const sessionFinalTranscriptRef = useRef("")
@@ -372,37 +373,61 @@ export function PromtprDashboard() {
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
             Recent History
           </h2>
-          <div className="space-y-3">
-            {history.map((item) => (
-              <div
-                key={item.id}
-                className="rounded-xl bg-white p-4 ring-1 ring-gray-200"
-              >
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-xs text-gray-400">
-                    {new Date(item.created_at).toLocaleString()}
-                  </span>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <p className="mb-1 text-xs font-medium uppercase text-gray-400">
+          <div className="space-y-1">
+            {history.map((item) => {
+              const isExpanded = expandedIds.has(item.id)
+              return (
+                <div
+                  key={item.id}
+                  className="rounded-lg bg-white ring-1 ring-gray-200"
+                >
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setExpandedIds((prev) => {
+                        const next = new Set(prev)
+                        if (next.has(item.id)) next.delete(item.id)
+                        else next.add(item.id)
+                        return next
+                      })
+                    }
+                    className="flex w-full items-center gap-3 px-3 py-2 text-left"
+                  >
+                    <svg
+                      className={`h-3.5 w-3.5 shrink-0 text-gray-400 transition-transform duration-150 ${isExpanded ? "rotate-90" : ""}`}
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                    <span className="shrink-0 text-xs text-gray-400">
+                      {new Date(item.created_at).toLocaleString()}
+                    </span>
+                    <span className="shrink-0 text-xs font-medium uppercase text-gray-400">
                       Original
-                    </p>
-                    <p className="whitespace-pre-wrap text-sm text-gray-700">
+                    </span>
+                    <span className="truncate text-sm text-gray-700">
                       {item.original_prompt}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="mb-1 text-xs font-medium uppercase text-gray-400">
-                      Improved
-                    </p>
-                    <p className="whitespace-pre-wrap text-sm text-gray-900">
-                      {item.improved_prompt}
-                    </p>
-                  </div>
+                    </span>
+                  </button>
+
+                  {isExpanded && (
+                    <div className="border-t border-gray-100 px-3 pb-3 pt-2">
+                      <p className="mb-1 text-xs font-medium uppercase text-gray-400">
+                        Improved
+                      </p>
+                      <p className="whitespace-pre-wrap text-sm text-gray-900">
+                        {item.improved_prompt}
+                      </p>
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </section>
       )}
