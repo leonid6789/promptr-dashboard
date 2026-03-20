@@ -1,9 +1,16 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+
+type HistoryItem = {
+  id: string
+  original_prompt: string
+  improved_prompt: string
+  created_at: string
+}
 
 type SpeechRecognitionResult = {
   0: {
@@ -41,9 +48,25 @@ export function PromtprDashboard() {
   const [isSpeechSupported, setIsSpeechSupported] = useState(false)
   const [interimTranscript, setInterimTranscript] = useState("")
   const [isCopied, setIsCopied] = useState(false)
+  const [history, setHistory] = useState<HistoryItem[]>([])
 
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
   const sessionFinalTranscriptRef = useRef("")
+
+  const fetchHistory = useCallback(async () => {
+    const supabase = createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return
+    const { data } = await supabase
+      .from("PromptsTBL")
+      .select("id, original_prompt, improved_prompt, created_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(10)
+    setHistory(data ?? [])
+  }, [])
 
   useEffect(() => {
     const fetchCredits = async () => {
@@ -60,7 +83,8 @@ export function PromtprDashboard() {
       setCredits(data?.credits ?? 0)
     }
     fetchCredits()
-  }, [])
+    fetchHistory()
+  }, [fetchHistory])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -215,6 +239,7 @@ export function PromtprDashboard() {
               if (typeof payload.credits === "number") {
                 setCredits(payload.credits)
               }
+              fetchHistory()
             } else if (payload.type === "error") {
               setGenerateError(payload.error ?? "Something went wrong")
             }
@@ -340,6 +365,47 @@ export function PromtprDashboard() {
           )}
         </div>
       </main>
+
+      {/* Prompt History */}
+      {history.length > 0 && (
+        <section className="px-6 pb-6">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
+            Recent History
+          </h2>
+          <div className="space-y-3">
+            {history.map((item) => (
+              <div
+                key={item.id}
+                className="rounded-xl bg-white p-4 ring-1 ring-gray-200"
+              >
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-xs text-gray-400">
+                    {new Date(item.created_at).toLocaleString()}
+                  </span>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <p className="mb-1 text-xs font-medium uppercase text-gray-400">
+                      Original
+                    </p>
+                    <p className="whitespace-pre-wrap text-sm text-gray-700">
+                      {item.original_prompt}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="mb-1 text-xs font-medium uppercase text-gray-400">
+                      Improved
+                    </p>
+                    <p className="whitespace-pre-wrap text-sm text-gray-900">
+                      {item.improved_prompt}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   )
 }

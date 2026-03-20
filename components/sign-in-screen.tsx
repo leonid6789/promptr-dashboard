@@ -69,7 +69,7 @@ export function SignInScreen() {
             <FieldLabel className="text-sm text-black">Email</FieldLabel>
             <Input
               type="email"
-              placeholder="Kole@gmail.com"
+              placeholder="username@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="rounded-lg border-gray-300 bg-white"

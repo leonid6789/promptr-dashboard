@@ -97,6 +97,12 @@ export async function POST(request: Request) {
               .eq("id", user.id)
               .single()
             updatedCredits = updated?.credits ?? credits - 1
+
+            await supabase.from("PromptsTBL").insert({
+              user_id: user.id,
+              original_prompt: prompt,
+              improved_prompt: fullText.trim(),
+            })
           }
 
           const finalPayload = JSON.stringify({
