@@ -50,6 +50,7 @@ export function PromtprDashboard() {
   const [isCopied, setIsCopied] = useState(false)
   const [history, setHistory] = useState<HistoryItem[]>([])
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const [buyingPack, setBuyingPack] = useState<number | null>(null)
 
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
   const sessionFinalTranscriptRef = useRef("")
@@ -272,6 +273,29 @@ export function PromtprDashboard() {
     }
   }
 
+  const handleBuyCredits = async (pack: number) => {
+    setBuyingPack(pack)
+    try {
+      const res = await fetch("/api/create-checkout-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pack }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setGenerateError(data.error ?? "Failed to start checkout")
+        return
+      }
+      if (data.url) {
+        window.location.href = data.url
+      }
+    } catch {
+      setGenerateError("Failed to start checkout")
+    } finally {
+      setBuyingPack(null)
+    }
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-gray-100">
       {/* Top Bar */}
@@ -289,9 +313,18 @@ export function PromtprDashboard() {
           >
             Log out
           </Button>
-          <Button className="rounded-lg bg-black text-white hover:bg-black/90">
-            Upgrade
-          </Button>
+          <div className="flex items-center gap-1.5">
+            {[100, 500, 2000].map((pack) => (
+              <Button
+                key={pack}
+                onClick={() => handleBuyCredits(pack)}
+                disabled={buyingPack !== null}
+                className="rounded-lg bg-black text-white hover:bg-black/90 disabled:opacity-50"
+              >
+                {buyingPack === pack ? "Redirecting…" : `Buy ${pack}`}
+              </Button>
+            ))}
+          </div>
         </div>
       </header>
 
