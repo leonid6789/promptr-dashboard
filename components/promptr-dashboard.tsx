@@ -1,9 +1,27 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
+import { usePathname, useRouter } from "next/navigation"
+import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
+
+const CREDIT_PACKS: { credits: number; priceLabel: string }[] = [
+  { credits: 100, priceLabel: "$5" },
+  { credits: 500, priceLabel: "$15" },
+  { credits: 2000, priceLabel: "$39" },
+]
+
+/** Prevents duplicate checkout-return handling when React Strict Mode runs effects twice. */
+let stripeCheckoutReturnHandling = false
 
 type HistoryItem = {
   id: string
@@ -38,6 +56,9 @@ type SpeechRecognitionInstance = {
 type BrowserSpeechRecognitionConstructor = new () => SpeechRecognitionInstance
 
 export function PromtprDashboard() {
+  const router = useRouter()
+  const pathname = usePathname()
+
   const [prompt, setPrompt] = useState("")
   const [credits, setCredits] = useState<number>(0)
   const [improvedPrompt, setImprovedPrompt] = useState("")
@@ -51,6 +72,7 @@ export function PromtprDashboard() {
   const [history, setHistory] = useState<HistoryItem[]>([])
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [buyingPack, setBuyingPack] = useState<number | null>(null)
+  const [buyCreditsOpen, setBuyCreditsOpen] = useState(false)
 
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
   const sessionFinalTranscriptRef = useRef("")
@@ -70,23 +92,61 @@ export function PromtprDashboard() {
     setHistory(data ?? [])
   }, [])
 
+  const fetchCredits = useCallback(async () => {
+    const supabase = createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return
+    const { data } = await supabase
+      .from("UsersTBL")
+      .select("credits")
+      .eq("id", user.id)
+      .single()
+    setCredits(data?.credits ?? 0)
+  }, [])
+
   useEffect(() => {
-    const fetchCredits = async () => {
-      const supabase = createClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user) return
-      const { data } = await supabase
-        .from("UsersTBL")
-        .select("credits")
-        .eq("id", user.id)
-        .single()
-      setCredits(data?.credits ?? 0)
-    }
     fetchCredits()
     fetchHistory()
-  }, [fetchHistory])
+  }, [fetchCredits, fetchHistory])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+
+    const params = new URLSearchParams(window.location.search)
+    const checkoutStatus = params.get("checkout")
+    if (checkoutStatus !== "success" && checkoutStatus !== "cancelled") return
+    if (stripeCheckoutReturnHandling) return
+    stripeCheckoutReturnHandling = true
+
+    const clearCheckoutFromUrl = () => {
+      const nextParams = new URLSearchParams(window.location.search)
+      if (!nextParams.has("checkout")) return
+      nextParams.delete("checkout")
+      const rest = nextParams.toString()
+      router.replace(rest ? `${pathname}?${rest}` : pathname, { scroll: false })
+    }
+
+    if (checkoutStatus === "success") {
+      void (async () => {
+        try {
+          await fetchCredits()
+          toast.success("Credits added successfully")
+          clearCheckoutFromUrl()
+        } finally {
+          stripeCheckoutReturnHandling = false
+        }
+      })()
+    } else {
+      try {
+        toast("Checkout cancelled")
+        clearCheckoutFromUrl()
+      } finally {
+        stripeCheckoutReturnHandling = false
+      }
+    }
+  }, [fetchCredits, pathname, router])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -275,6 +335,7 @@ export function PromtprDashboard() {
 
   const handleBuyCredits = async (pack: number) => {
     setBuyingPack(pack)
+    let redirecting = false
     try {
       const res = await fetch("/api/create-checkout-session", {
         method: "POST",
@@ -287,12 +348,16 @@ export function PromtprDashboard() {
         return
       }
       if (data.url) {
+        redirecting = true
         window.location.href = data.url
+        return
       }
     } catch {
       setGenerateError("Failed to start checkout")
     } finally {
-      setBuyingPack(null)
+      if (!redirecting) {
+        setBuyingPack(null)
+      }
     }
   }
 
@@ -313,20 +378,50 @@ export function PromtprDashboard() {
           >
             Log out
           </Button>
-          <div className="flex items-center gap-1.5">
-            {[100, 500, 2000].map((pack) => (
-              <Button
-                key={pack}
-                onClick={() => handleBuyCredits(pack)}
-                disabled={buyingPack !== null}
-                className="rounded-lg bg-black text-white hover:bg-black/90 disabled:opacity-50"
-              >
-                {buyingPack === pack ? "Redirecting…" : `Buy ${pack}`}
-              </Button>
-            ))}
-          </div>
+          <Button
+            type="button"
+            onClick={() => setBuyCreditsOpen(true)}
+            className="rounded-lg bg-black text-white hover:bg-black/90"
+          >
+            Buy Credits
+          </Button>
         </div>
       </header>
+
+      <Dialog open={buyCreditsOpen} onOpenChange={setBuyCreditsOpen}>
+        <DialogContent className="border-gray-200 bg-white text-black sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-black">Buy credits</DialogTitle>
+            <DialogDescription className="text-gray-600">
+              Choose a pack. You will be redirected to Stripe Checkout to
+              complete payment.
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="grid gap-3">
+            {CREDIT_PACKS.map(({ credits, priceLabel }) => (
+              <li
+                key={credits}
+                className="flex items-center justify-between gap-3 rounded-lg bg-gray-50 px-4 py-3 ring-1 ring-gray-200"
+              >
+                <div className="min-w-0">
+                  <p className="font-medium text-black">
+                    {credits.toLocaleString()} credits
+                  </p>
+                  <p className="text-sm text-gray-600">{priceLabel}</p>
+                </div>
+                <Button
+                  type="button"
+                  onClick={() => handleBuyCredits(credits)}
+                  disabled={buyingPack !== null}
+                  className="shrink-0 rounded-lg bg-black text-white hover:bg-black/90 disabled:opacity-50"
+                >
+                  {buyingPack === credits ? "Redirecting…" : "Purchase"}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </DialogContent>
+      </Dialog>
 
       {/* Main Body */}
       <main className="flex flex-1 gap-4 p-6">
