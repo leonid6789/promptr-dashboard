@@ -34,6 +34,18 @@ export async function POST(request: Request) {
   }
 
   if (event.type === "checkout.session.completed") {
+    const eventId = event.id
+    console.log(`Processing checkout.session.completed: ${eventId}`)
+
+    const { error: insertEventError } = await supabaseAdmin
+      .from("StripeEventsTBL")
+      .insert({ id: eventId })
+
+    if (insertEventError) {
+      console.log(`Duplicate Stripe event ${eventId}, skipping`)
+      return NextResponse.json({ received: true })
+    }
+
     const session = event.data.object as Stripe.Checkout.Session
     const userId = session.metadata?.user_id
     const creditsRaw = session.metadata?.credits_to_add
@@ -87,6 +99,24 @@ export async function POST(request: Request) {
     console.log(
       `Added ${creditsToAdd} credits to user ${userId} (new total: ${newCredits})`
     )
+
+    const { error: purchaseError } = await supabaseAdmin
+      .from("PurchasesTBL")
+      .insert({
+        user_id: userId,
+        stripe_event_id: eventId,
+        stripe_session_id: session.id,
+        credits: creditsToAdd,
+        amount_total: session.amount_total,
+        currency: session.currency,
+        customer_email: session.customer_details?.email || null,
+      })
+
+    if (purchaseError) {
+      console.error("Failed to record purchase:", purchaseError.message)
+    } else {
+      console.log("Purchase recorded:", session.id)
+    }
   }
 
   return NextResponse.json({ received: true })
