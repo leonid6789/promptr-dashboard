@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { ratelimit } from "@/lib/ratelimit"
 import Anthropic from "@anthropic-ai/sdk"
 import { NextResponse } from "next/server"
 
@@ -16,6 +17,28 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
+      )
+    }
+
+    const identifier = user.id
+      ? `user:${user.id}`
+      : `ip:${request.headers.get("x-forwarded-for") ?? "unknown"}`
+
+    const { success, limit, remaining, reset } =
+      await ratelimit.limit(identifier)      
+
+    if (!success) {
+      console.warn(`Rate limit exceeded for ${identifier}`)
+      return NextResponse.json(
+        { error: "Rate limit exceeded. Please wait a moment and try again." },
+        {
+          status: 429,
+          headers: {
+            "X-RateLimit-Limit": limit.toString(),
+            "X-RateLimit-Remaining": remaining.toString(),
+            "X-RateLimit-Reset": reset.toString(),
+          },
+        }
       )
     }
 
