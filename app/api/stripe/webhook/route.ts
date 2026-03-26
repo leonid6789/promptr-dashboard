@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server"
 import Stripe from "stripe"
+import { Resend } from "resend"
 import { supabaseAdmin } from "@/lib/supabase/admin"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
+const resend = new Resend(process.env.RESEND_API_KEY!)
 
 export async function POST(request: Request) {
   const body = await request.text()
@@ -116,6 +118,29 @@ export async function POST(request: Request) {
       console.error("Failed to record purchase:", purchaseError.message)
     } else {
       console.log("Purchase recorded:", session.id)
+    }
+
+    const email = session.customer_details?.email
+    if (email) {
+      try {
+        await resend.emails.send({
+          from: "Promptr <login@leonidemails.site>",
+          to: [email],
+          subject: "Your Promptr Credits Receipt",
+          html: `
+            <h2>Thank you for your purchase!</h2>
+            <p>You have successfully purchased <strong>${session.metadata?.credits_to_add ?? "0"} credits</strong>.</p>
+            <p>Amount Paid: $${((session.amount_total ?? 0) / 100).toFixed(2)}</p>
+            <p>If you have any questions, just reply to this email.</p>
+          `,
+        })
+        console.log("Receipt email sent to:", email)
+      } catch (emailError) {
+        console.error(
+          "Failed to send receipt email:",
+          emailError instanceof Error ? emailError.message : emailError
+        )
+      }
     }
   }
 
