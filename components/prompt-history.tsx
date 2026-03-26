@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { AppHeader } from "@/components/app-header"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, Search } from "lucide-react"
 
 type HistoryItem = {
   id: string
@@ -18,6 +18,17 @@ export function PromptHistory() {
   const [history, setHistory] = useState<HistoryItem[]>([])
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [isLoading, setIsLoading] = useState(true)
+  const [search, setSearch] = useState("")
+
+  const filteredHistory = useMemo(() => {
+    const query = search.toLowerCase().trim()
+    if (!query) return history
+    return history.filter(
+      (item) =>
+        item.original_prompt.toLowerCase().includes(query) ||
+        item.improved_prompt.toLowerCase().includes(query)
+    )
+  }, [history, search])
 
   const fetchCredits = useCallback(async () => {
     const supabase = createClient()
@@ -68,6 +79,19 @@ export function PromptHistory() {
           </Link>
           <h2 className="text-lg font-semibold text-black">Prompt History</h2>
         </div>
+
+        {!isLoading && history.length > 0 && (
+          <div className="relative mt-4">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search prompt history…"
+              className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm text-black placeholder:text-gray-400 shadow-sm outline-none transition-colors focus:border-gray-300 focus:ring-1 focus:ring-gray-300"
+            />
+          </div>
+        )}
       </div>
 
       <main className="flex-1 px-6 pb-6 pt-4">
@@ -79,9 +103,13 @@ export function PromptHistory() {
           <p className="py-16 text-center text-sm text-gray-400">
             Your prompt history will appear here.
           </p>
+        ) : filteredHistory.length === 0 ? (
+          <p className="py-16 text-center text-sm text-gray-400">
+            No prompts match your search.
+          </p>
         ) : (
           <div className="space-y-1">
-            {history.map((item) => {
+            {filteredHistory.map((item) => {
               const isExpanded = expandedIds.has(item.id)
               return (
                 <div

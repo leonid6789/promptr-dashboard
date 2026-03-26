@@ -146,7 +146,12 @@ export function AppHeader({ credits, onCreditsRefresh }: AppHeaderProps) {
         <div className="flex items-center gap-3">
           <Link
             href="/history"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-700 shadow-sm transition-all hover:bg-gray-50 hover:border-gray-300 active:bg-gray-100 active:scale-95"
+            aria-current={pathname === "/history" ? "page" : undefined}
+            className={
+              pathname === "/history"
+                ? "inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 bg-gray-100 text-black shadow-sm"
+                : "inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-700 shadow-sm transition-all hover:bg-gray-50 hover:border-gray-300 active:bg-gray-100 active:scale-95"
+            }
             title="Prompt History"
           >
             <Clock3 className="h-4 w-4" />
