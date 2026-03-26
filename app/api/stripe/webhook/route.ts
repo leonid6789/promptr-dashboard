@@ -123,15 +123,73 @@ export async function POST(request: Request) {
     const email = session.customer_details?.email
     if (email) {
       try {
+        const credits = session.metadata?.credits_to_add ?? "0"
+        const amount = ((session.amount_total ?? 0) / 100).toFixed(2)
+
         await resend.emails.send({
           from: "Promptr <login@leonidemails.site>",
           to: [email],
           subject: "Your Promptr Credits Receipt",
           html: `
-            <h2>Thank you for your purchase!</h2>
-            <p>You have successfully purchased <strong>${session.metadata?.credits_to_add ?? "0"} credits</strong>.</p>
-            <p>Amount Paid: $${((session.amount_total ?? 0) / 100).toFixed(2)}</p>
-            <p>If you have any questions, just reply to this email.</p>
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:40px 0;">
+    <tr><td align="center">
+      <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+
+        <!-- Header -->
+        <tr>
+          <td style="background-color:#18181b;padding:32px 40px;text-align:center;">
+            <h1 style="margin:0;font-size:24px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">Promptr</h1>
+            <p style="margin:8px 0 0;font-size:14px;color:#a1a1aa;">Payment Receipt</p>
+          </td>
+        </tr>
+
+        <!-- Body -->
+        <tr>
+          <td style="background-color:#ffffff;padding:40px;">
+            <p style="margin:0 0 24px;font-size:16px;line-height:1.5;color:#27272a;">Thank you for your purchase! Here&rsquo;s a summary of your order.</p>
+
+            <!-- Details Card -->
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#fafafa;border:1px solid #e4e4e7;border-radius:8px;overflow:hidden;">
+              <tr>
+                <td style="padding:20px 24px;border-bottom:1px solid #e4e4e7;">
+                  <p style="margin:0;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#71717a;">Credits Purchased</p>
+                  <p style="margin:6px 0 0;font-size:28px;font-weight:700;color:#18181b;">${credits}</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:20px 24px;border-bottom:1px solid #e4e4e7;">
+                  <p style="margin:0;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#71717a;">Amount Paid</p>
+                  <p style="margin:6px 0 0;font-size:28px;font-weight:700;color:#18181b;">$${amount}</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:20px 24px;">
+                  <p style="margin:0;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#71717a;">Email</p>
+                  <p style="margin:6px 0 0;font-size:15px;color:#18181b;">${email}</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="background-color:#ffffff;padding:0 40px 40px;text-align:center;">
+            <hr style="border:none;border-top:1px solid #e4e4e7;margin:0 0 24px;">
+            <p style="margin:0;font-size:13px;line-height:1.6;color:#71717a;">If you have any questions, just reply to this email.</p>
+            <p style="margin:12px 0 0;font-size:12px;color:#a1a1aa;">&copy; ${new Date().getFullYear()} Promptr. All rights reserved.</p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
           `,
         })
         console.log("Receipt email sent to:", email)

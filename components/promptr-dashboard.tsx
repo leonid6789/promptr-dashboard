@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
+import { Receipt } from "lucide-react"
 
 const CREDIT_PACKS: { credits: number; priceLabel: string }[] = [
   { credits: 100, priceLabel: "$5" },
@@ -28,6 +29,15 @@ type HistoryItem = {
   original_prompt: string
   improved_prompt: string
   created_at: string
+}
+
+type PurchaseItem = {
+  id: string
+  credits: number
+  amount_total: number
+  currency: string
+  created_at: string
+  stripe_session_id: string | null
 }
 
 type SpeechRecognitionResult = {
@@ -73,6 +83,8 @@ export function PromtprDashboard() {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [buyingPack, setBuyingPack] = useState<number | null>(null)
   const [buyCreditsOpen, setBuyCreditsOpen] = useState(false)
+  const [purchases, setPurchases] = useState<PurchaseItem[]>([])
+  const [purchaseHistoryOpen, setPurchaseHistoryOpen] = useState(false)
 
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
   const sessionFinalTranscriptRef = useRef("")
@@ -106,10 +118,25 @@ export function PromtprDashboard() {
     setCredits(data?.credits ?? 0)
   }, [])
 
+  const fetchPurchases = useCallback(async () => {
+    const supabase = createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return
+    const { data } = await supabase
+      .from("PurchasesTBL")
+      .select("id, credits, amount_total, currency, created_at, stripe_session_id")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+    setPurchases(data ?? [])
+  }, [])
+
   useEffect(() => {
     fetchCredits()
     fetchHistory()
-  }, [fetchCredits, fetchHistory])
+    fetchPurchases()
+  }, [fetchCredits, fetchHistory, fetchPurchases])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -132,6 +159,7 @@ export function PromtprDashboard() {
       void (async () => {
         try {
           await fetchCredits()
+          await fetchPurchases()
           toast.success("Credits added successfully")
           clearCheckoutFromUrl()
         } finally {
@@ -146,7 +174,7 @@ export function PromtprDashboard() {
         stripeCheckoutReturnHandling = false
       }
     }
-  }, [fetchCredits, pathname, router])
+  }, [fetchCredits, fetchPurchases, pathname, router])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -378,6 +406,15 @@ export function PromtprDashboard() {
           >
             Log out
           </Button>
+          <button
+            type="button"
+            onClick={() => setPurchaseHistoryOpen(true)}
+            disabled={purchases.length === 0}
+            title={purchases.length === 0 ? "No purchase history yet" : "Purchase History"}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-700 shadow-sm transition-all hover:bg-gray-50 hover:border-gray-300 active:bg-gray-100 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:border-gray-200 disabled:active:scale-100"
+          >
+            <Receipt className="h-4 w-4" />
+          </button>
           <Button
             type="button"
             onClick={() => setBuyCreditsOpen(true)}
@@ -420,6 +457,59 @@ export function PromtprDashboard() {
               </li>
             ))}
           </ul>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={purchaseHistoryOpen} onOpenChange={setPurchaseHistoryOpen}>
+        <DialogContent className="border-gray-200 bg-white text-black sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-black">Purchase History</DialogTitle>
+            <DialogDescription className="text-gray-600">
+              Your credit purchases and payment receipts.
+            </DialogDescription>
+          </DialogHeader>
+          {purchases.length === 0 ? (
+            <p className="py-8 text-center text-sm text-gray-400">
+              Your purchase history will appear here.
+            </p>
+          ) : (
+            <div className="max-h-80 overflow-auto rounded-lg border border-gray-200">
+              <table className="w-full text-left text-sm">
+                <thead className="sticky top-0 bg-gray-50">
+                  <tr className="border-b border-gray-200 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                    <th className="px-4 py-2.5">Date</th>
+                    <th className="px-4 py-2.5">Credits</th>
+                    <th className="px-4 py-2.5">Amount</th>
+                    <th className="px-4 py-2.5">Ref</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {purchases.map((p) => (
+                    <tr
+                      key={p.id}
+                      className="border-b border-gray-50 last:border-0"
+                    >
+                      <td className="whitespace-nowrap px-4 py-2.5 text-gray-500">
+                        {new Date(p.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-2.5 font-medium text-black">
+                        +{p.credits.toLocaleString()}
+                      </td>
+                      <td className="px-4 py-2.5 text-gray-700">
+                        ${((p.amount_total ?? 0) / 100).toFixed(2)}{" "}
+                        {p.currency?.toUpperCase()}
+                      </td>
+                      <td className="px-4 py-2.5 font-mono text-xs text-gray-400">
+                        {p.stripe_session_id
+                          ? `…${p.stripe_session_id.slice(-6)}`
+                          : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
@@ -559,6 +649,7 @@ export function PromtprDashboard() {
           </div>
         </section>
       )}
+
     </div>
   )
 }
