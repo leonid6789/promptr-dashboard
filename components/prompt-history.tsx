@@ -6,6 +6,13 @@ import { createClient } from "@/lib/supabase/client"
 import { AppHeader } from "@/components/app-header"
 import { ArrowLeft, Check, Copy, Search, Trash2, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 type HistoryItem = {
   id: string
@@ -22,6 +29,7 @@ export function PromptHistory() {
   const [search, setSearch] = useState("")
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [isDeleting, setIsDeleting] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
 
   const handleCopy = async (text: string, key: string) => {
@@ -107,13 +115,12 @@ export function PromptHistory() {
     }
   }
 
-  const handleDeleteSelected = async () => {
+  const handleDeleteSelected = () => {
     if (selectedIds.size === 0) return
-    const confirmed = window.confirm(
-      `Delete ${selectedIds.size} selected prompt history item${selectedIds.size > 1 ? "s" : ""}?`
-    )
-    if (!confirmed) return
+    setShowDeleteDialog(true)
+  }
 
+  const handleConfirmDelete = async () => {
     setIsDeleting(true)
     try {
       const supabase = createClient()
@@ -135,6 +142,7 @@ export function PromptHistory() {
         return next
       })
       setSelectedIds(new Set())
+      setShowDeleteDialog(false)
     } finally {
       setIsDeleting(false)
     }
@@ -320,6 +328,36 @@ export function PromptHistory() {
           </div>
         )}
       </main>
+
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="border-gray-200 bg-white text-black sm:max-w-md translate-y-0">
+          <DialogHeader>
+            <DialogTitle className="text-black">Delete History</DialogTitle>
+            <DialogDescription className="text-gray-600">
+              Are you sure you want to delete {selectedIds.size} selected prompt
+              {selectedIds.size > 1 ? "s" : ""}? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteDialog(false)}
+              disabled={isDeleting}
+              className="rounded-lg border-gray-200 bg-white text-black hover:bg-gray-50"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmDelete}
+              disabled={isDeleting}
+              className="rounded-lg"
+            >
+              {isDeleting ? "Deleting…" : "Delete"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
