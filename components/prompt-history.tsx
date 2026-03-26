@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { AppHeader } from "@/components/app-header"
-import { ArrowLeft, Search, Trash2, X } from "lucide-react"
+import { ArrowLeft, Check, Copy, Search, Trash2, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 type HistoryItem = {
@@ -22,6 +22,17 @@ export function PromptHistory() {
   const [search, setSearch] = useState("")
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [isDeleting, setIsDeleting] = useState(false)
+  const [copiedKey, setCopiedKey] = useState<string | null>(null)
+
+  const handleCopy = async (text: string, key: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedKey(key)
+      setTimeout(() => setCopiedKey((prev) => (prev === key ? null : prev)), 1500)
+    } catch {
+      // clipboard unavailable
+    }
+  }
 
   const filteredHistory = useMemo(() => {
     const query = search.toLowerCase().trim()
@@ -260,17 +271,43 @@ export function PromptHistory() {
                   {isExpanded && (
                     <div className="border-t border-gray-100 px-3 pb-3 pt-2">
                       <div className="mb-2">
-                        <p className="mb-0.5 text-xs font-medium uppercase text-gray-400">
-                          Original
-                        </p>
+                        <div className="mb-0.5 flex items-center justify-between">
+                          <p className="text-xs font-medium uppercase text-gray-400">
+                            Original
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => handleCopy(item.original_prompt, `${item.id}:original`)}
+                            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-gray-400 transition-colors hover:bg-gray-50 hover:text-gray-600"
+                          >
+                            {copiedKey === `${item.id}:original` ? (
+                              <><Check className="h-3 w-3" /> Copied!</>
+                            ) : (
+                              <><Copy className="h-3 w-3" /> Copy</>
+                            )}
+                          </button>
+                        </div>
                         <p className="whitespace-pre-wrap text-sm text-gray-700">
                           {item.original_prompt}
                         </p>
                       </div>
                       <div>
-                        <p className="mb-0.5 text-xs font-medium uppercase text-gray-400">
-                          Improved
-                        </p>
+                        <div className="mb-0.5 flex items-center justify-between">
+                          <p className="text-xs font-medium uppercase text-gray-400">
+                            Improved
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => handleCopy(item.improved_prompt, `${item.id}:improved`)}
+                            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-gray-400 transition-colors hover:bg-gray-50 hover:text-gray-600"
+                          >
+                            {copiedKey === `${item.id}:improved` ? (
+                              <><Check className="h-3 w-3" /> Copied!</>
+                            ) : (
+                              <><Copy className="h-3 w-3" /> Copy</>
+                            )}
+                          </button>
+                        </div>
                         <p className="whitespace-pre-wrap text-sm text-gray-900">
                           {item.improved_prompt}
                         </p>
