@@ -278,7 +278,7 @@ export function PromtprDashboard() {
         {/* Left Panel */}
         <div className="relative flex flex-1 flex-col rounded-xl bg-gray-50 ring-1 ring-gray-200">
           <Textarea
-            placeholder="Describe your UI component here"
+            placeholder="What would you like to improve? (e.g., explain something, write instructions, ask a question)"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             className="flex-1 resize-none border-0 bg-transparent p-4 text-base focus-visible:ring-0"
